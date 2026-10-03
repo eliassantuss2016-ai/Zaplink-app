@@ -1,516 +1,928 @@
-
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR" class="h-full bg-slate-950 text-slate-100">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gerador de Links WhatsApp & Chat Global</title>
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ZapLink - Gerador de Links & Comunidades (Supabase)</title>
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#effef5',
-              100: '#d7fbe4',
-              500: '#25D366',
-              600: '#128C7E',
-              700: '#075E54',
-              800: '#054c44',
-              900: '#022c27'
-            }
-          }
-        }
-      }
-    }
-  </script>
   
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- QRCode.js -->
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- QRCode.js library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-</head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans transition-colors duration-200">
 
-  <!-- Header -->
-  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <div class="bg-brand-500/10 p-2 rounded-xl text-brand-500 border border-brand-500/20">
-          <i data-lucide="message-square" class="w-6 h-6"></i>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(71, 85, 105, 1);
+    }
+    
+    .view-screen {
+      transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    }
+    .view-screen.hidden-screen {
+      display: none !important;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Status Indicator */
+    .status-online {
+      background-color: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+    .status-offline {
+      background-color: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+    }
+
+    /* Hide horizontal scrollbar for pills */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100 overflow-hidden select-none">
+
+  <!-- TOP HEADER / STATUS BAR -->
+  <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 px-4 py-3 flex items-center justify-between z-30 shrink-0">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+        <i class="fa-brands fa-whatsapp text-lg"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-1.5">
+          <h1 class="font-bold text-base tracking-tight leading-none text-slate-100">ZapLink</h1>
+          <button onclick="accessModerationPanel()" title="Painel de Modera√ß√£o Exclusivo (Ctrl+Shift+M)" class="text-slate-600 hover:text-amber-400 text-xs transition">
+            <i class="fa-solid fa-lock"></i>
+          </button>
         </div>
-        <span class="font-bold text-lg tracking-tight text-white">ZapLink <span class="text-brand-500">+</span> Community</span>
+        <p class="text-[10px] text-slate-400 leading-none mt-1">Supabase Edition & Ferramentas</p>
       </div>
-      <div class="flex items-center gap-2 text-xs text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700">
-        <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block transition-colors duration-300"></span>
-        <span id="status-text">Conectando...</span>
+    </div>
+
+    <!-- Status Indicator & User Profile Access -->
+    <div class="flex items-center gap-3">
+      <div id="statusIndicator" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-xs">
+        <span id="statusDot" class="w-2.5 h-2.5 rounded-full status-offline transition-all"></span>
+        <span id="statusText" class="text-[11px] font-medium text-slate-300">Conectando...</span>
       </div>
+
+      <button onclick="openProfileModal()" class="flex items-center gap-2 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700/80 rounded-full transition text-xs">
+        <i class="fa-solid fa-user-gear text-emerald-400"></i>
+        <span id="headerUserName" class="max-w-[80px] truncate font-medium text-slate-200">Perfil</span>
+      </button>
     </div>
   </header>
 
-  <main class="flex-1 max-w-4xl w-full mx-auto p-4 space-y-6">
+  <!-- NAVIGATION TABS SWITCHER -->
+  <div class="bg-slate-900/50 border-b border-slate-800/80 px-2 py-1.5 flex gap-2 shrink-0 z-20">
+    <button id="tabGeneratorBtn" onclick="switchTab('generator')" class="flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition bg-emerald-600 text-white shadow-lg shadow-emerald-950/40">
+      <i class="fa-solid fa-link"></i> Gerador de Links
+    </button>
+    <button id="tabChatBtn" onclick="switchTab('chat')" class="relative flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/50">
+      <i class="fa-solid fa-comments"></i> Comunidades
+      <span id="unreadBadge" class="hidden absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow">0</span>
+    </button>
+  </div>
 
-    <!-- GERADOR DE LINKS ZAP -->
-    <section class="bg-slate-800/50 border border-slate-700/60 rounded-2xl p-5 md:p-6 shadow-xl backdrop-blur">
-      <div class="flex items-center gap-2 mb-4">
-        <i data-lucide="link" class="w-5 h-5 text-brand-500"></i>
-        <h1 class="text-xl font-bold text-white">Gerador de Link Direto</h1>
-      </div>
+  <!-- MAIN CONTAINER WITH DUAL SCREENS -->
+  <main class="flex-1 relative overflow-hidden bg-slate-950">
 
-      <div class="grid md:grid-cols-2 gap-4">
-        <!-- Input N˙mero -->
-        <div>
-          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            N˙mero do WhatsApp
-          </label>
-          <div class="relative flex items-center">
-            <span class="absolute left-3 font-semibold text-slate-400 select-none bg-slate-700/50 px-2 py-1 rounded text-sm">+55</span>
-            <input 
-              type="tel" 
-              id="phone-input" 
-              placeholder="(11) 99999-9999" 
-              maxlength="15"
-              class="w-full pl-16 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all text-lg font-medium"
-            >
+    <!-- SCREEN 1: LINK GENERATOR -->
+    <section id="screenGenerator" class="view-screen h-full overflow-y-auto p-4 max-w-xl mx-auto flex flex-col justify-between">
+      <div class="space-y-5">
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 shadow-xl">
+          <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2 mb-3">
+            <i class="fa-solid fa-bolt text-emerald-400"></i> Gerar Link Direto do WhatsApp
+          </h2>
+          
+          <div class="space-y-3">
+            <label class="block text-xs text-slate-400">N√∫mero do WhatsApp (com DDD):</label>
+            <div class="relative flex items-center">
+              <input type="tel" id="genPhoneInput" placeholder="(79) 99999-9999" onkeyup="formatPhoneInput(this)" class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 pr-20 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono transition">
+              
+              <div class="absolute right-2 flex items-center gap-1">
+                <button onclick="clearGenInput()" title="Limpar campo" class="p-1.5 text-slate-500 hover:text-slate-300 active:scale-95 transition">
+                  <i class="fa-solid fa-circle-xmark text-sm"></i>
+                </button>
+                <button onclick="pasteFromClipboard()" title="Colar da √Årea de Transfer√™ncia" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 active:scale-95 text-emerald-400 border border-slate-700 rounded-lg text-xs font-medium flex items-center gap-1 transition">
+                  <i class="fa-solid fa-paste"></i> Colar
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Mensagem Inicial (Opcional):</label>
+              <textarea id="genMessageInput" rows="2" placeholder="Ol√°! Vi seu contato pelo ZapLink..." class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-3 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition resize-none"></textarea>
+            </div>
+
+            <button onclick="generateWhatsappLink()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-semibold rounded-xl text-sm transition shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2">
+              <i class="fa-brands fa-whatsapp text-lg"></i> Gerar Link & QR Code
+            </button>
           </div>
         </div>
 
-        <!-- Atalhos R·pidos -->
-        <div>
-          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-            Mensagens R·pidas
-          </label>
-          <div class="flex flex-wrap gap-1.5">
-            <button onclick="setQuickMsg('Ol·! Gostaria de mais informaÁıes.')" class="text-xs bg-slate-700/50 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-600/50 transition">
-              InformaÁıes
+        <div id="genResultBox" class="hidden bg-slate-900/80 border border-emerald-500/30 rounded-2xl p-4 shadow-2xl space-y-4 animate-fade-in">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-circle-check"></i> Link Gerado com Sucesso!
+            </span>
+            <button onclick="closeResultBox()" class="text-slate-500 hover:text-slate-300 text-xs">
+              <i class="fa-solid fa-xmark"></i>
             </button>
-            <button onclick="setQuickMsg('Ol·! Quero agendar um hor·rio.')" class="text-xs bg-slate-700/50 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-600/50 transition">
-              Agendamento
+          </div>
+
+          <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs font-mono text-emerald-300 break-all select-all flex items-center justify-between gap-2" id="generatedUrlText">
+            https://wa.me/...
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="copyGeneratedUrl()" class="py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 rounded-xl text-xs font-medium border border-slate-700 flex items-center justify-center gap-1.5 transition">
+              <i class="fa-solid fa-copy text-emerald-400"></i> Copiar Link
             </button>
-            <button onclick="setQuickMsg('Ol·! Qual o valor do orÁamento?')" class="text-xs bg-slate-700/50 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-600/50 transition">
-              OrÁamento
-            </button>
+            <a id="openGeneratedUrlBtn" href="#" target="_blank" class="py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-medium flex items-center justify-center gap-1.5 transition">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir WhatsApp
+            </a>
+          </div>
+
+          <div class="pt-2 flex flex-col items-center justify-center border-t border-slate-800/80">
+            <p class="text-[11px] text-slate-400 mb-2">Escaneie o QR Code abaixo:</p>
+            <div id="qrcode" class="p-3 bg-white rounded-xl shadow-md border border-slate-200"></div>
           </div>
         </div>
       </div>
 
-      <!-- Input Mensagem -->
-      <div class="mt-4">
-        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-          Mensagem Inicial (Opcional)
-        </label>
-        <textarea 
-          id="msg-input" 
-          rows="2" 
-          placeholder="Digite a mensagem prÈ-definida aqui..." 
-          class="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all text-sm resize-none"
-        ></textarea>
-      </div>
-
-      <!-- Bot„o AÁ„o Principal -->
-      <div class="mt-5 flex flex-col sm:flex-row gap-3">
-        <button 
-          id="btn-open-chat"
-          onclick="openWhatsApp()" 
-          class="flex-1 bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold py-3.5 px-6 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-brand-500/20 active:scale-[0.98] transition-all text-base"
-        >
-          <i data-lucide="send" class="w-5 h-5"></i>
-          <span>Abrir Conversa Agora</span>
-        </button>
-
-        <button 
-          onclick="copyGeneratedLink()" 
-          class="bg-slate-700 hover:bg-slate-600 text-white font-medium py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98]"
-          title="Copiar Link"
-        >
-          <i data-lucide="copy" class="w-5 h-5"></i>
-          <span class="sm:hidden">Copiar Link</span>
-        </button>
-
-        <button 
-          onclick="toggleQrCode()" 
-          class="bg-slate-700 hover:bg-slate-600 text-white font-medium py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98]"
-          title="Ver QR Code"
-        >
-          <i data-lucide="qr-code" class="w-5 h-5"></i>
-          <span class="sm:hidden">QR Code</span>
-        </button>
-      </div>
-
-      <!-- Painel QR Code ExpandÌvel -->
-      <div id="qr-panel" class="hidden mt-5 p-4 bg-slate-900 border border-slate-700 rounded-xl flex flex-col items-center gap-3">
-        <div id="qrcode" class="p-2 bg-white rounded-lg shadow"></div>
-        <p class="text-xs text-slate-400">Escaneie com a c‚mera do celular para abrir o chat</p>
-      </div>
+      <footer class="text-center text-[10px] text-slate-600 py-4">
+        ZapLink Supabase Edition &copy; 2026 ‚Ä¢ Modera√ß√£o Ativa
+      </footer>
     </section>
 
-    <!-- CHAT GLOBAL -->
-    <section class="bg-slate-800/50 border border-slate-700/60 rounded-2xl shadow-xl backdrop-blur flex flex-col overflow-hidden h-[500px]">
+    <!-- SCREEN 2: REAL-TIME CHAT & COMMUNITIES -->
+    <section id="screenChat" class="view-screen hidden-screen h-full flex flex-col">
       
-      <!-- Banner Header do Chat -->
-      <div class="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
-        <div>
-          <h2 class="font-bold text-white text-base flex items-center gap-2">
-            <i data-lucide="globe" class="w-4 h-4 text-brand-500"></i>
-            Chat Global da Comunidade
-          </h2>
-          <p class="text-xs text-slate-400">Conecte-se com outros usu·rios. Clique no Ìcone do WhatsApp para falar diretamente.</p>
-        </div>
-      </div>
-
-      <!-- ¡rea de Login R·pido (Se n„o identificado) -->
-      <div id="auth-panel" class="p-6 bg-slate-900/90 flex-1 flex flex-col items-center justify-center text-center">
-        <div class="max-w-xs w-full space-y-4">
-          <div class="bg-brand-500/10 p-3 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-brand-500 border border-brand-500/20">
-            <i data-lucide="user-plus" class="w-6 h-6"></i>
-          </div>
-          <div>
-            <h3 class="font-bold text-white text-lg">Entrar no Chat</h3>
-            <p class="text-xs text-slate-400 mt-1">Escolha um apelido simples para participar das conversas em tempo real.</p>
-          </div>
-
-          <form onsubmit="joinChat(event)" class="space-y-3">
-            <input 
-              type="text" 
-              id="user-name-input" 
-              placeholder="Seu Nome ou Apelido *" 
-              required
-              maxlength="20"
-              class="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 text-sm"
-            >
-            <div class="relative flex items-center">
-              <span class="absolute left-3 text-xs text-slate-500">+55</span>
-              <input 
-                type="tel" 
-                id="user-phone-input" 
-                placeholder="Seu Whats (Opcional)" 
-                maxlength="15"
-                class="w-full pl-10 pr-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 text-sm"
-              >
-            </div>
-            <p class="text-[10px] text-slate-500 text-left">Ao colocar seu WhatsApp, outros usu·rios poder„o clicar para te enviar mensagem.</p>
-            <button 
-              type="submit" 
-              class="w-full bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold py-2.5 rounded-xl text-sm transition"
-            >
-              Participar do Chat
+      <!-- COMMUNITY ROOM CAROUSEL SELECTOR -->
+      <div class="bg-slate-900 border-b border-slate-800 p-2 shrink-0">
+        <div class="flex items-center justify-between gap-2 mb-2 px-1">
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-users text-emerald-400"></i> Comunidades Ativas:
+          </span>
+          
+          <div class="flex items-center gap-1">
+            <button onclick="openCreateRoomModal()" title="Criar Nova Comunidade" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-sm">
+              <i class="fa-solid fa-plus text-[10px]"></i> Criar Sala
             </button>
-          </form>
+            <button id="deleteRoomBtn" onclick="deleteCurrentRoom()" title="Excluir esta Comunidade" class="hidden px-2 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-medium flex items-center gap-1 transition active:scale-95">
+              <i class="fa-solid fa-trash-can text-[10px]"></i>
+            </button>
+          </div>
         </div>
+
+        <!-- Scrollable Horizontal Pills Bar -->
+        <div id="roomsContainer" class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar"></div>
       </div>
 
-      <!-- Feed de Mensagens do Chat -->
-      <div id="chat-feed" class="hidden flex-1 p-4 overflow-y-auto space-y-3 bg-slate-900/40">
-        <!-- Mensagens via JS -->
+      <!-- ACTIVE COMMUNITY HEADER BAR -->
+      <div class="bg-slate-900/90 border-b border-slate-800 px-3 py-2 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <h3 id="currentRoomTitle" class="text-xs font-bold text-emerald-400 tracking-wide uppercase"># Global</h3>
+        </div>
+        <span id="currentRoomCount" class="text-[10px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded-full border border-slate-800">Canal Ativo</span>
       </div>
 
-      <!-- Input para Enviar Mensagem -->
-      <div id="chat-input-panel" class="hidden p-3 bg-slate-800 border-t border-slate-700">
-        <form onsubmit="sendMessage(event)" class="flex gap-2">
-          <input 
-            type="text" 
-            id="chat-message-input" 
-            placeholder="Digite uma mensagem..." 
-            maxlength="250"
-            required
-            class="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 text-sm"
-          >
-          <button 
-            type="submit" 
-            class="bg-brand-500 hover:bg-brand-600 text-slate-950 px-4 py-2.5 rounded-xl font-bold flex items-center justify-center transition active:scale-95"
-          >
-            <i data-lucide="send" class="w-4 h-4"></i>
-          </button>
-        </form>
+      <!-- CHAT MESSAGES FEED -->
+      <div id="chatFeed" class="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-950/80">
+        <div class="text-center py-8 text-slate-500 text-xs">Carregando mensagens...</div>
       </div>
 
+      <!-- TYPING INDICATOR DISPLAY -->
+      <div id="typingIndicator" class="hidden px-4 py-1 text-[11px] text-emerald-400 italic bg-slate-900/60 border-t border-slate-800/40 shrink-0">
+        <i class="fa-solid fa-pen-nib animate-pulse mr-1"></i> <span id="typingUserText">Algu√©m</span> est√° digitando...
+      </div>
+
+      <!-- CHAT INPUT BAR -->
+      <form id="chatForm" onsubmit="handleSendMessage(event)" class="bg-slate-900 border-t border-slate-800 p-2.5 flex items-center gap-2 shrink-0">
+        <input type="text" id="chatInput" oninput="handleTypingNotification()" placeholder="Escreva sua mensagem..." autocomplete="off" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
+        <button type="submit" class="w-10 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white flex items-center justify-center shadow-md transition shrink-0">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </form>
     </section>
 
   </main>
 
-  <!-- Notification Toast -->
-  <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 border border-brand-500/50 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
-    <i data-lucide="check-circle" class="w-5 h-5 text-brand-500"></i>
-    <span id="toast-msg" class="text-sm font-medium">NotificaÁ„o</span>
+  <!-- MODAL: EDIT USER PROFILE -->
+  <div id="profileModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-sm text-slate-100 flex items-center gap-2">
+          <i class="fa-solid fa-user-pen text-emerald-400"></i> Meu Perfil
+        </h3>
+        <button onclick="closeProfileModal()" class="text-slate-500 hover:text-slate-300">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <!-- Display Unique Immutabile ID -->
+        <div class="p-2.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+          <span class="text-[11px] text-slate-400 font-medium">Seu ID √önico (Fixo):</span>
+          <span id="displayMyUid" class="text-xs font-mono font-bold text-emerald-400">...</span>
+        </div>
+
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Nome / Apelido no Chat:</label>
+          <input type="text" id="profileNameInput" placeholder="Ex: Elias Marinho" class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Seu WhatsApp (Privado):</label>
+          <input type="tel" id="profilePhoneInput" placeholder="(79) 99999-9999" onkeyup="formatPhoneInput(this)" class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <button onclick="saveProfileChanges()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow transition">
+          Salvar Altera√ß√µes
+        </button>
+      </div>
+
+      <div class="border-t border-slate-800 pt-3">
+        <h4 class="text-xs font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
+          <i class="fa-solid fa-address-book text-emerald-400"></i> Zaps Conectados
+        </h4>
+        <div id="acceptedContactsList" class="max-h-28 overflow-y-auto space-y-1.5 text-xs text-slate-400">
+          <p class="text-[11px] text-slate-500 italic">Nenhum contato aceito ainda.</p>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- SCRIPT PRINCIPAL DA APLICA«√O -->
+  <!-- MODAL: USER PROFILE CARD & ZAP REQUEST TRIGGER -->
+  <div id="userCardModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4 text-center">
+      <div class="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xl flex items-center justify-center mx-auto">
+        <i class="fa-solid fa-user"></i>
+      </div>
+
+      <div>
+        <h3 id="cardUserName" class="font-bold text-base text-slate-100">Nome do Usu√°rio</h3>
+        <p id="cardUserId" class="text-[10px] text-emerald-400 font-mono mt-0.5">ID: ...</p>
+      </div>
+
+      <div class="space-y-2 pt-2 border-t border-slate-800">
+        <button id="requestZapBtn" onclick="sendZapRequest()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition shadow">
+          <i class="fa-brands fa-whatsapp"></i> Enviar Pedido de Zap
+        </button>
+        <button onclick="closeUserCardModal()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE NEW COMMUNITY -->
+  <div id="createRoomModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-xs rounded-2xl p-5 shadow-2xl space-y-4">
+      <h3 class="font-bold text-sm text-slate-100 flex items-center gap-2">
+        <i class="fa-solid fa-plus-circle text-emerald-400"></i> Criar Nova Comunidade
+      </h3>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Nome da Comunidade:</label>
+        <input type="text" id="newRoomNameInput" placeholder="Ex: Jogos, Eventos, Design..." class="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-emerald-500">
+      </div>
+      <div class="flex gap-2">
+        <button onclick="closeCreateRoomModal()" class="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs">Cancelar</button>
+        <button onclick="confirmCreateRoom()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold">Criar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXCLUSIVE MODAL: MODERATION AUDIT PANEL -->
+  <div id="moderationModal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-amber-500/30 w-full max-w-2xl rounded-2xl p-5 shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3 shrink-0">
+        <h3 class="font-bold text-sm text-amber-400 flex items-center gap-2">
+          <i class="fa-solid fa-shield-cat"></i> Painel de Fiscaliza√ß√£o & Auditoria (Supabase)
+        </h3>
+        <button onclick="closeModerationModal()" class="text-slate-500 hover:text-slate-300">
+          <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+      </div>
+
+      <div id="moderationContent" class="flex-1 overflow-y-auto space-y-3 pr-1 text-xs text-slate-300">
+        <p class="text-center text-slate-500 py-6">Carregando relat√≥rios de auditoria...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- INCOMING ZAP REQUEST NOTIFICATION TOAST -->
+  <div id="requestBanner" class="hidden fixed bottom-16 left-4 right-4 max-w-sm mx-auto bg-slate-900 border border-emerald-500/40 p-4 rounded-2xl shadow-2xl z-40">
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg shrink-0">
+        <i class="fa-brands fa-whatsapp"></i>
+      </div>
+      <div class="flex-1">
+        <h4 id="reqBannerTitle" class="text-xs font-bold text-slate-100">Pedido de Zap Recebido!</h4>
+        <p id="reqBannerText" class="text-[11px] text-slate-300 mt-0.5">Algu√©m deseja seu n√∫mero para conversar no WhatsApp.</p>
+        
+        <div class="flex gap-2 mt-3">
+          <button onclick="respondZapRequest(true)" class="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-semibold transition">Aceitar & Enviar</button>
+          <button onclick="respondZapRequest(false)" class="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] transition">Recusar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT SUPABASE INTEGRATION -->
   <script>
-    // ConfiguraÁ„o Inicial do Firebase
-    const firebaseConfig = {
-      databaseURL: "https://canvas-default-rtdb.firebaseio.com/"
-    };
-    
-    // Inicializar Firebase
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
+    /* ==========================================================================
+       CONFIGURA√á√ïES SUPABASE
+       ========================================================================== */
+    const SUPABASE_URL = 'https://gugupwzmhwodmggsesvh.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_3_MNp_tX0f4txAprVOFAXw_lvomcGvV';
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ID permanente e imut√°vel por dispositivo
+    let myUserId = localStorage.getItem('zaplink_uid');
+    if (!myUserId) {
+      myUserId = 'usr_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('zaplink_uid', myUserId);
     }
-    const db = firebase.database();
-    const chatRef = db.ref('global_chat_v1');
 
-    // Vari·veis Globais
-    let currentUser = JSON.parse(localStorage.getItem('zap_user')) || null;
-    let qrCodeObj = null;
-    let lastSentTime = 0;
+    let myUserName = localStorage.getItem('zaplink_name') || 'Usu√°rio ' + myUserId.substr(-4);
+    let myUserPhone = localStorage.getItem('zaplink_phone') || '';
+    
+    let currentTab = 'generator';
+    let currentRoom = 'global';
+    let activeTargetUser = null;
+    let activeIncomingRequest = null;
+    let unreadCount = 0;
+    const MODERATION_PIN = '1234';
 
-    // InicializaÁ„o
-    document.addEventListener('DOMContentLoaded', () => {
-      lucide.createIcons();
-      setupPhoneMask();
-      setupFirebaseStatus();
-      checkUserAuth();
-      listenMessages();
+    let roomsList = [
+      { id: 'global', name: 'Global' },
+      { id: 'vendas', name: 'Vendas' },
+      { id: 'networking', name: 'Networking' }
+    ];
+
+    let messagesChannel = null;
+
+    /* ==========================================================================
+       INICIALIZA√á√ÉO & REGISTRO DE USU√ÅRIO
+       ========================================================================== */
+    window.addEventListener('DOMContentLoaded', async () => {
+      document.getElementById('displayMyUid').innerText = myUserId;
+      document.getElementById('profileNameInput').value = myUserName;
+      document.getElementById('profilePhoneInput').value = myUserPhone;
+      document.getElementById('headerUserName').innerText = myUserName;
+
+      // Upsert do usu√°rio no Supabase
+      await supabaseClient.from('users').upsert({
+        id: myUserId,
+        name: myUserName,
+        phone: myUserPhone,
+        updated_at: new Date()
+      });
+
+      setupPresence();
+      renderRooms();
+      switchRoom('global', 'Global');
+      listenToRealtimeMessages();
+      listenToIncomingRequests();
+      renderSavedContacts();
+
+      window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'M' || e.key === 'm')) {
+          e.preventDefault();
+          accessModerationPanel();
+        }
+      });
     });
 
-    // M·scara de Telefone do Gerador
-    function setupPhoneMask() {
-      const phoneInput = document.getElementById('phone-input');
-      const userPhoneInput = document.getElementById('user-phone-input');
+    function setupPresence() {
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
 
-      const applyMask = (e) => {
-        let value = e.target.value.replace(/\D/g, '');
-        if (value.length > 11) value = value.slice(0, 11);
-
-        if (value.length > 6) {
-          value = `(${value.slice(0, 2)}) ${value.slice(2, 7)}-${value.slice(7)}`;
-        } else if (value.length > 2) {
-          value = `(${value.slice(0, 2)}) ${value.slice(2)}`;
-        } else if (value.length > 0) {
-          value = `(${value}`;
-        }
-        e.target.value = value;
-      };
-
-      phoneInput.addEventListener('input', applyMask);
-      userPhoneInput.addEventListener('input', applyMask);
-    }
-
-    // Definir mensagem r·pida
-    function setQuickMsg(text) {
-      document.getElementById('msg-input').value = text;
-    }
-
-    // Construir Link Final do WhatsApp
-    function getCleanPhone(raw) {
-      return raw.replace(/\D/g, '');
-    }
-
-    function buildWhatsAppUrl() {
-      const rawPhone = document.getElementById('phone-input').value;
-      const cleanPhone = getCleanPhone(rawPhone);
-      const msg = document.getElementById('msg-input').value.trim();
-
-      if (!cleanPhone || cleanPhone.length < 10) {
-        showToast('Por favor, insira um n˙mero v·lido com DDD.');
-        return null;
+      if (navigator.onLine) {
+        statusDot.className = 'w-2.5 h-2.5 rounded-full status-online';
+        statusText.innerText = 'Online';
       }
 
-      const fullNum = `55${cleanPhone}`;
-      let url = `https://wa.me/${fullNum}`;
-      if (msg) {
-        url += `?text=${encodeURIComponent(msg)}`;
-      }
-      return url;
-    }
+      window.addEventListener('online', () => {
+        statusDot.className = 'w-2.5 h-2.5 rounded-full status-online';
+        statusText.innerText = 'Online';
+      });
 
-    // Abrir Conversa
-    function openWhatsApp() {
-      const url = buildWhatsAppUrl();
-      if (url) window.open(url, '_blank');
-    }
-
-    // Copiar Link
-    function copyGeneratedLink() {
-      const url = buildWhatsAppUrl();
-      if (!url) return;
-      navigator.clipboard.writeText(url).then(() => {
-        showToast('Link copiado para a ·rea de transferÍncia!');
+      window.addEventListener('offline', () => {
+        statusDot.className = 'w-2.5 h-2.5 rounded-full status-offline';
+        statusText.innerText = 'Offline';
       });
     }
 
-    // Gerar QR Code
-    function toggleQrCode() {
-      const panel = document.getElementById('qr-panel');
-      const url = buildWhatsAppUrl();
+    /* ==========================================================================
+       NAVEGA√á√ÉO E ABAS
+       ========================================================================== */
+    function switchTab(tab) {
+      currentTab = tab;
+      const genScreen = document.getElementById('screenGenerator');
+      const chatScreen = document.getElementById('screenChat');
+      const genBtn = document.getElementById('tabGeneratorBtn');
+      const chatBtn = document.getElementById('tabChatBtn');
+      const unreadBadge = document.getElementById('unreadBadge');
 
-      if (!url) return;
+      if (tab === 'generator') {
+        genScreen.classList.remove('hidden-screen');
+        chatScreen.classList.add('hidden-screen');
 
-      if (!panel.classList.contains('hidden')) {
-        panel.classList.add('hidden');
+        genBtn.className = "flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition bg-emerald-600 text-white shadow-lg shadow-emerald-950/40";
+        chatBtn.className = "relative flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/50";
+      } else {
+        chatScreen.classList.remove('hidden-screen');
+        genScreen.classList.add('hidden-screen');
+
+        chatBtn.className = "relative flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition bg-emerald-600 text-white shadow-lg shadow-emerald-950/40";
+        genBtn.className = "flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition text-slate-400 hover:text-slate-200 hover:bg-slate-800/50";
+
+        unreadCount = 0;
+        unreadBadge.classList.add('hidden');
+        scrollChatToBottom();
+      }
+    }
+
+    /* ==========================================================================
+       GERADOR DE LINKS DO WHATSAPP
+       ========================================================================== */
+    function formatPhoneInput(input) {
+      let value = input.value.replace(/\D/g, "");
+      if (value.length > 11) value = value.slice(0, 11);
+
+      if (value.length > 6) {
+        input.value = `(${value.slice(0,2)}) ${value.slice(2,7)}-${value.slice(7)}`;
+      } else if (value.length > 2) {
+        input.value = `(${value.slice(0,2)}) ${value.slice(2)}`;
+      } else {
+        input.value = value;
+      }
+    }
+
+    function clearGenInput() {
+      document.getElementById('genPhoneInput').value = '';
+      document.getElementById('genMessageInput').value = '';
+      document.getElementById('genResultBox').classList.add('hidden');
+    }
+
+    async function pasteFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById('genPhoneInput').value = text;
+        formatPhoneInput(document.getElementById('genPhoneInput'));
+      } catch (err) {
+        alert("N√£o foi poss√≠vel acessar a √°rea de transfer√™ncia.");
+      }
+    }
+
+    function generateWhatsappLink() {
+      const phoneRaw = document.getElementById('genPhoneInput').value.replace(/\D/g, "");
+      const message = document.getElementById('genMessageInput').value.trim();
+
+      if (phoneRaw.length < 10) {
+        alert("Insira um n√∫mero de WhatsApp v√°lido com DDD.");
         return;
       }
 
-      panel.classList.remove('hidden');
-      const container = document.getElementById('qrcode');
-      container.innerHTML = '';
+      let finalUrl = `https://wa.me/55${phoneRaw}`;
+      if (message) {
+        finalUrl += `?text=${encodeURIComponent(message)}`;
+      }
 
-      qrCodeObj = new QRCode(container, {
-        text: url,
-        width: 160,
-        height: 160,
-        colorDark: "#000000",
+      document.getElementById('generatedUrlText').innerText = finalUrl;
+      document.getElementById('openGeneratedUrlBtn').href = finalUrl;
+      document.getElementById('genResultBox').classList.remove('hidden');
+
+      const qrContainer = document.getElementById('qrcode');
+      qrContainer.innerHTML = "";
+      new QRCode(qrContainer, {
+        text: finalUrl,
+        width: 140,
+        height: 140,
+        colorDark: "#0f172a",
         colorLight: "#ffffff",
         correctLevel: QRCode.CorrectLevel.H
       });
     }
 
-    // Exibir Toast Visual
-    function showToast(msg) {
-      const toast = document.getElementById('toast');
-      const toastMsg = document.getElementById('toast-msg');
-      toastMsg.textContent = msg;
-      toast.classList.remove('translate-y-20', 'opacity-0');
-
-      setTimeout(() => {
-        toast.classList.add('translate-y-20', 'opacity-0');
-      }, 3000);
+    function closeResultBox() {
+      document.getElementById('genResultBox').classList.add('hidden');
     }
 
-    // Status da Conex„o Firebase (Indicador On/Off)
-    function setupFirebaseStatus() {
-      const connectedRef = db.ref('.info/connected');
-      const statusDot = document.getElementById('status-dot');
-      const statusText = document.getElementById('status-text');
+    function copyGeneratedUrl() {
+      const urlText = document.getElementById('generatedUrlText').innerText;
+      navigator.clipboard.writeText(urlText);
+      alert("Link copiado para a √°rea de transfer√™ncia!");
+    }
 
-      connectedRef.on('value', (snap) => {
-        if (snap.val() === true) {
-          statusDot.classList.replace('bg-red-500', 'bg-emerald-500');
-          statusText.textContent = 'Chat Online';
-        } else {
-          statusDot.classList.replace('bg-emerald-500', 'bg-red-500');
-          statusText.textContent = 'Offline';
-        }
+    /* ==========================================================================
+       COMUNIDADES E CHAT EM TEMPO REAL (SUPABASE)
+       ========================================================================== */
+    function renderRooms() {
+      const container = document.getElementById('roomsContainer');
+      container.innerHTML = '';
+
+      roomsList.forEach(room => {
+        const isActive = room.id === currentRoom;
+        const btn = document.createElement('button');
+        btn.onclick = () => switchRoom(room.id, room.name);
+        btn.className = `px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
+          isActive 
+            ? 'bg-emerald-600 text-white shadow-md' 
+            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+        }`;
+        btn.innerHTML = `<i class="fa-solid fa-hashtag text-[10px] ${isActive ? 'text-white' : 'text-emerald-400'}"></i> ${room.name}`;
+        container.appendChild(btn);
       });
-    }
 
-    // Gest„o do Usu·rio do Chat
-    function checkUserAuth() {
-      if (currentUser && currentUser.name) {
-        document.getElementById('auth-panel').classList.add('hidden');
-        document.getElementById('chat-feed').classList.remove('hidden');
-        document.getElementById('chat-input-panel').classList.remove('hidden');
+      const deleteBtn = document.getElementById('deleteRoomBtn');
+      if (currentRoom !== 'global' && currentRoom !== 'vendas' && currentRoom !== 'networking') {
+        deleteBtn.classList.remove('hidden');
+      } else {
+        deleteBtn.classList.add('hidden');
       }
     }
 
-    function joinChat(e) {
-      e.preventDefault();
-      const name = document.getElementById('user-name-input').value.trim();
-      const rawPhone = document.getElementById('user-phone-input').value.trim();
-      const cleanPhone = getCleanPhone(rawPhone);
-
-      if (!name) return;
-
-      currentUser = {
-        name,
-        phone: cleanPhone.length >= 10 ? `55${cleanPhone}` : null,
-        id: 'user_' + Math.random().toString(36).substr(2, 9)
-      };
-
-      localStorage.setItem('zap_user', JSON.stringify(currentUser));
-      checkUserAuth();
-      showToast(`Bem-vindo, ${name}!`);
+    async function switchRoom(roomId, roomName) {
+      currentRoom = roomId;
+      document.getElementById('currentRoomTitle').innerText = `# ${roomName}`;
+      renderRooms();
+      await fetchRoomMessages(roomId);
     }
 
-    // Envio de Mensagens no Chat
-    function sendMessage(e) {
-      e.preventDefault();
-      if (!currentUser) return;
+    async function fetchRoomMessages(roomId) {
+      const feed = document.getElementById('chatFeed');
+      feed.innerHTML = '<div class="text-center py-8 text-slate-500 text-xs">Carregando mensagens...</div>';
 
-      // Rate limit simples (3s entre mensagens)
-      const now = Date.now();
-      if (now - lastSentTime < 3000) {
-        showToast('Aguarde alguns segundos entre o envio de mensagens.');
+      const { data, error } = await supabaseClient
+        .from('messages')
+        .select('*')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      if (error) {
+        feed.innerHTML = '<div class="text-center py-8 text-rose-500 text-xs">Erro ao carregar mensagens.</div>';
         return;
       }
 
-      const input = document.getElementById('chat-message-input');
+      renderMessagesList(data || []);
+    }
+
+    function renderMessagesList(messages) {
+      const feed = document.getElementById('chatFeed');
+      feed.innerHTML = '';
+
+      if (messages.length === 0) {
+        feed.innerHTML = '<div class="text-center py-8 text-slate-600 text-xs italic">Nenhuma mensagem nesta comunidade ainda. Seja o primeiro!</div>';
+        return;
+      }
+
+      messages.forEach(msg => {
+        const isMe = msg.user_id === myUserId;
+        const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const div = document.createElement('div');
+        div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-0.5`;
+
+        div.innerHTML = `
+          <div class="flex items-center gap-1.5 px-1">
+            <button onclick="openUserCard('${msg.user_id}', '${msg.user_name}')" class="text-[10px] font-semibold text-emerald-400 hover:underline">
+              ${msg.user_name}
+            </button>
+            <span class="text-[9px] text-slate-500">${timeStr}</span>
+          </div>
+          <div class="max-w-[85%] px-3 py-2 rounded-2xl text-xs break-words shadow-sm ${
+            isMe 
+              ? 'bg-emerald-600 text-white rounded-tr-none' 
+              : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'
+          }">
+            ${escapeHtml(msg.text)}
+          </div>
+        `;
+        feed.appendChild(div);
+      });
+
+      scrollChatToBottom();
+    }
+
+    function listenToRealtimeMessages() {
+      if (messagesChannel) {
+        supabaseClient.removeChannel(messagesChannel);
+      }
+
+      messagesChannel = supabaseClient
+        .channel('public:messages')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+          const newMsg = payload.new;
+          if (newMsg.room_id === currentRoom) {
+            appendSingleMessage(newMsg);
+          } else if (currentTab !== 'chat') {
+            unreadCount++;
+            const badge = document.getElementById('unreadBadge');
+            badge.innerText = unreadCount;
+            badge.classList.remove('hidden');
+          }
+        })
+        .subscribe();
+    }
+
+    function appendSingleMessage(msg) {
+      const feed = document.getElementById('chatFeed');
+      const isMe = msg.user_id === myUserId;
+      const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const div = document.createElement('div');
+      div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-0.5`;
+
+      div.innerHTML = `
+        <div class="flex items-center gap-1.5 px-1">
+          <button onclick="openUserCard('${msg.user_id}', '${msg.user_name}')" class="text-[10px] font-semibold text-emerald-400 hover:underline">
+            ${msg.user_name}
+          </button>
+          <span class="text-[9px] text-slate-500">${timeStr}</span>
+        </div>
+        <div class="max-w-[85%] px-3 py-2 rounded-2xl text-xs break-words shadow-sm ${
+          isMe 
+            ? 'bg-emerald-600 text-white rounded-tr-none' 
+            : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'
+        }">
+          ${escapeHtml(msg.text)}
+        </div>
+      `;
+      feed.appendChild(div);
+      scrollChatToBottom();
+    }
+
+    async function handleSendMessage(e) {
+      e.preventDefault();
+      const input = document.getElementById('chatInput');
       const text = input.value.trim();
 
       if (!text) return;
 
-      const newMsg = {
-        userId: currentUser.id,
-        userName: currentUser.name,
-        userPhone: currentUser.phone || null,
-        text: text,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-      };
-
-      chatRef.push(newMsg, (err) => {
-        if (!err) {
-          input.value = '';
-          lastSentTime = Date.now();
-        } else {
-          showToast('Erro ao enviar mensagem.');
-        }
+      const { error } = await supabaseClient.from('messages').insert({
+        room_id: currentRoom,
+        user_id: myUserId,
+        user_name: myUserName,
+        text: text
       });
-    }
 
-    // Escutar Mensagens no Firebase
-    function listenMessages() {
-      // Limita o carregamento para as ˙ltimas 50 mensagens
-      chatRef.limitToLast(50).on('child_added', (snapshot) => {
-        const msg = snapshot.val();
-        renderMessage(msg);
-      });
-    }
-
-    // Renderizar Mensagem no Feed
-    function renderMessage(msg) {
-      const feed = document.getElementById('chat-feed');
-      const isMe = currentUser && currentUser.id === msg.userId;
-
-      const messageDiv = document.createElement('div');
-      messageDiv.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} my-1`;
-
-      const date = msg.timestamp ? new Date(msg.timestamp) : new Date();
-      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-      let waButtonHtml = '';
-      if (msg.userPhone && !isMe) {
-        const waUrl = `https://wa.me/${msg.userPhone}?text=${encodeURIComponent(`Ol· ${msg.userName}, vi sua mensagem no Chat Global!`)}`;
-        waButtonHtml = `
-          <a href="${waUrl}" target="_blank" class="inline-flex items-center gap-1 text-[11px] text-brand-500 hover:underline font-semibold ml-2">
-            <i data-lucide="phone-call" class="w-3 h-3"></i>
-            Chamar no Zap
-          </a>
-        `;
+      if (error) {
+        alert("Erro ao enviar mensagem.");
+        return;
       }
 
-      messageDiv.innerHTML = `
-        <div class="flex items-center gap-1 text-[11px] text-slate-400 mb-0.5 px-1">
-          <span class="font-bold ${isMe ? 'text-brand-500' : 'text-slate-300'}">${escapeHtml(msg.userName)}</span>
-          <span>ï ${timeStr}</span>
-          ${waButtonHtml}
-        </div>
-        <div class="max-w-[85%] px-3.5 py-2 rounded-2xl text-sm ${
-          isMe 
-            ? 'bg-brand-600 text-white rounded-tr-none' 
-            : 'bg-slate-800 text-slate-100 rounded-tl-none border border-slate-700'
-        } shadow">
-          ${escapeHtml(msg.text)}
-        </div>
-      `;
-
-      feed.appendChild(messageDiv);
-      feed.scrollTop = feed.scrollHeight;
-      lucide.createIcons();
+      input.value = '';
     }
 
-    // FunÁ„o de SanatizaÁ„o B·sica
-    function escapeHtml(str) {
-      if (!str) return '';
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    function scrollChatToBottom() {
+      const feed = document.getElementById('chatFeed');
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    function handleTypingNotification() {
+      // Opcional para Realtime Broadcast futuramente se necess√°rio
+    }
+
+    /* ==========================================================================
+       GEST√ÉO DE PERFIL E CONTATOS
+       ========================================================================== */
+    function openProfileModal() {
+      document.getElementById('profileModal').classList.remove('hidden');
+    }
+
+    function closeProfileModal() {
+      document.getElementById('profileModal').classList.add('hidden');
+    }
+
+    async function saveProfileChanges() {
+      const name = document.getElementById('profileNameInput').value.trim();
+      const phone = document.getElementById('profilePhoneInput').value.trim();
+
+      if (!name) return;
+
+      myUserName = name;
+      myUserPhone = phone;
+
+      localStorage.setItem('zaplink_name', name);
+      localStorage.setItem('zaplink_phone', phone);
+      document.getElementById('headerUserName').innerText = name;
+
+      await supabaseClient.from('users').upsert({
+        id: myUserId,
+        name: name,
+        phone: phone,
+        updated_at: new Date()
+      });
+
+      alert("Perfil atualizado com sucesso!");
+      closeProfileModal();
+    }
+
+    function openUserCard(userId, userName) {
+      if (userId === myUserId) return;
+      activeTargetUser = { id: userId, name: userName };
+      document.getElementById('cardUserName').innerText = userName;
+      document.getElementById('cardUserId').innerText = `ID: ${userId}`;
+      document.getElementById('userCardModal').classList.remove('hidden');
+    }
+
+    function closeUserCardModal() {
+      document.getElementById('userCardModal').classList.add('hidden');
+      activeTargetUser = null;
+    }
+
+    async function sendZapRequest() {
+      if (!activeTargetUser) return;
+
+      const { error } = await supabaseClient.from('requests').insert({
+        to_user_id: activeTargetUser.id,
+        from_user_id: myUserId,
+        from_name: myUserName,
+        status: 'pending'
+      });
+
+      if (error) {
+        alert("Erro ao enviar pedido de Zap.");
+        return;
+      }
+
+      alert(`Solicita√ß√£o enviada para ${activeTargetUser.name}!`);
+      closeUserCardModal();
+    }
+
+    function listenToIncomingRequests() {
+      supabaseClient
+        .channel('public:requests')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, payload => {
+          const req = payload.new;
+          if (req.to_user_id === myUserId && req.status === 'pending') {
+            activeIncomingRequest = req;
+            document.getElementById('reqBannerTitle').innerText = `${req.from_name} deseja seu Zap!`;
+            document.getElementById('reqBannerText').innerText = "Aceite para compartilhar seu n√∫mero de WhatsApp com ele.";
+            document.getElementById('requestBanner').classList.remove('hidden');
+          }
+        })
+        .subscribe();
+    }
+
+    async function respondZapRequest(accepted) {
+      if (!activeIncomingRequest) return;
+
+      const banner = document.getElementById('requestBanner');
+      banner.classList.add('hidden');
+
+      if (accepted) {
+        if (!myUserPhone) {
+          alert("Cadastre seu n√∫mero no seu Perfil antes de aceitar!");
+          openProfileModal();
+          return;
+        }
+
+        // Salvar contato aceito localmente
+        let saved = JSON.parse(localStorage.getItem('zaplink_contacts') || '[]');
+        saved.push({ name: activeIncomingRequest.from_name, phone: 'Verificado' });
+        localStorage.setItem('zaplink_contacts', JSON.stringify(saved));
+        renderSavedContacts();
+
+        alert(`Contato aceito! O WhatsApp de ${activeIncomingRequest.from_name} √© privado.`);
+      }
+
+      await supabaseClient
+        .from('requests')
+        .update({ status: accepted ? 'accepted' : 'rejected' })
+        .eq('id', activeIncomingRequest.id);
+
+      activeIncomingRequest = null;
+    }
+
+    function renderSavedContacts() {
+      const container = document.getElementById('acceptedContactsList');
+      const saved = JSON.parse(localStorage.getItem('zaplink_contacts') || '[]');
+
+      if (saved.length === 0) {
+        container.innerHTML = '<p class="text-[11px] text-slate-500 italic">Nenhum contato aceito ainda.</p>';
+        return;
+      }
+
+      container.innerHTML = '';
+      saved.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'p-2 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between text-xs';
+        div.innerHTML = `<span class="font-medium text-slate-200">${c.name}</span> <span class="text-[10px] text-emerald-400">Conectado</span>`;
+        container.appendChild(div);
+      });
+    }
+
+    /* ==========================================================================
+       CRIA√á√ÉO DE SALAS E MODERA√á√ÉO
+       ========================================================================== */
+    function openCreateRoomModal() {
+      document.getElementById('createRoomModal').classList.remove('hidden');
+    }
+
+    function closeCreateRoomModal() {
+      document.getElementById('createRoomModal').classList.add('hidden');
+      document.getElementById('newRoomNameInput').value = '';
+    }
+
+    function confirmCreateRoom() {
+      const name = document.getElementById('newRoomNameInput').value.trim();
+      if (!name) return;
+
+      const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      if (roomsList.some(r => r.id === id)) {
+        alert("J√° existe uma comunidade com esse nome.");
+        return;
+      }
+
+      roomsList.push({ id, name });
+      closeCreateRoomModal();
+      switchRoom(id, name);
+    }
+
+    function deleteCurrentRoom() {
+      if (currentRoom === 'global' || currentRoom === 'vendas' || currentRoom === 'networking') return;
+      if (confirm("Tem certeza que deseja excluir esta comunidade?")) {
+        roomsList = roomsList.filter(r => r.id !== currentRoom);
+        switchRoom('global', 'Global');
+      }
+    }
+
+    function accessModerationPanel() {
+      const pin = prompt("Digite o PIN de Seguran√ßa da Modera√ß√£o:");
+      if (pin === MODERATION_PIN) {
+        document.getElementById('moderationModal').classList.remove('hidden');
+        loadModerationData();
+      } else if (pin !== null) {
+        alert("PIN incorreto.");
+      }
+    }
+
+    function closeModerationModal() {
+      document.getElementById('moderationModal').classList.add('hidden');
+    }
+
+    async function loadModerationData() {
+      const content = document.getElementById('moderationContent');
+      content.innerHTML = '<p class="text-center text-slate-500 py-4">Buscando dados no Supabase...</p>';
+
+      const { data: users, error } = await supabaseClient.from('users').select('*').limit(20);
+
+      if (error) {
+        content.innerHTML = '<p class="text-center text-rose-500 py-4">Erro ao carregar auditoria.</p>';
+        return;
+      }
+
+      content.innerHTML = `
+        <h4 class="font-bold text-slate-200 mb-2">Usu√°rios Cadastrados Recentemente (${users.length})</h4>
+        <div class="space-y-2">
+          ${users.map(u => `
+            <div class="p-2.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center justify-between">
+              <div>
+                <p class="font-bold text-emerald-400">${u.name}</p>
+                <p class="text-[10px] text-slate-500 font-mono">ID: ${u.id}</p>
+              </div>
+              <span class="text-[10px] text-slate-400">${new Date(u.updated_at).toLocaleDateString()}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function escapeHtml(text) {
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+      return text.replace(/[&<>"']/g, m => map[m]);
     }
   </script>
 </body>
 </html>
-
